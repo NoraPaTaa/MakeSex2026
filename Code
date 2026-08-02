@@ -15,9 +15,6 @@ import mbuild
 import time
 import math
 
-# ══════════════════════════════════════════════════════════════════
-# (M1-M4)
-# ══════════════════════════════════════════════════════════════════
 en = {
     "LF": encoder_motor_class("M1", "INDEX1"),  
     "LB": encoder_motor_class("M3", "INDEX1"),  
@@ -30,182 +27,44 @@ sv = {
 }
 
 mode = "1"
+#============================= GAMEPAD ================================
+#-------------------------------  FEED --------------------------------
+#DC1, DC2, DC3
+feed_up = gamepad.is_key_pressed("N2")
+feed_down = gamepad.is_key_pressed("N3")
+FEED_POWER = 70 
 
-"""
-CONTROLLER FUNCTION
-"""
+#---------------------------------  GRIPPER ---------------------------
+#DC8
+GRIPPER_L2_TIME = 900   
+hold = gamepad.is_key_pressed("N4")
+release = gamepad.is_key_pressed("N1") 
 
-# ───────────────────────── FEED ─────────────────────────
-feed_state = 0
-prev_feed_n1 = 0
-prev_feed_n2 = 0
+#---------------------------------  Life ------------------------------
+#DC4
+lift_up = False
+lift_down = False
+lift_up = gamepad.is_key_pressed("N2")
+lift_down = gamepad.is_key_pressed("N3")
 
-FEED_POWER = 70     
+#---------------------------------  Brushless -------------------------
+#BL1
+B_stage1   = gamepad.is_key_pressed("R1")
+B_stage2 = gamepad.is_key_pressed("Left")
+B_stop   = gamepad.is_key_pressed("R2")
 
-def feed(a: int, b: int, c: int):
-    power_expand_board.set_power("DC2", a)
-    power_expand_board.set_power("DC1", b)
-    power_expand_board.set_power("DC7", c)
+#-------------------------------  Movement ----------------------------
 
-def stop_feed():
-    power_expand_board.set_power("DC1", 0)
-    power_expand_board.set_power("DC2", 0)
-    power_expand_board.set_power("DC7", 0)
-
-def feed_control():
-    global feed_state, prev_feed_n1, prev_feed_n2
-
-    n1 = gamepad.is_key_pressed("N2")
-    n2 = gamepad.is_key_pressed("N3")
-
-    if n1 and not prev_feed_n1:
-        feed_state = 1
-    if n2 and not prev_feed_n2:
-        feed_state = 2
-
-    prev_feed_n1 = n1
-    prev_feed_n2 = n2
-
-    if gamepad.is_key_pressed("L1"):
-        feed_state = 0
-
-    if feed_state == 1:
-        feed(FEED_POWER, FEED_POWER, FEED_POWER) 
-    elif feed_state == 2:
-        feed(-FEED_POWER, -FEED_POWER, -FEED_POWER)  
-    else:
-        stop_feed()
-# ───────────────────────── FEED DC6 (แยก) ─────────────────────────
-dc6_state = 0      # 0=หยุด, 1=เปิด - ห้ามแก้ตรงนี้
-prev_n1_dc6 = 0    # ห้ามแก้ตรงนี้
-
-DC6_POWER = 80     # 🔧 ความแรง DC6 (0-100)
-
-def dc6_control():
-    global dc6_state, prev_n1_dc6
-
-    n1 = gamepad.is_key_pressed("N1")
-
-    if n1 and not prev_n1_dc6:
-        dc6_state = 1   # กด N1 = เปิดติดค้าง
-
-    prev_n1_dc6 = n1
-
-    if gamepad.is_key_pressed("L1"):
-        dc6_state = 0   # L1 = หยุด (ปุ่มเดียวกับ feed หลัก)
-
-    if dc6_state == 1:
-        power_expand_board.set_power("DC6", DC6_POWER)
-    else:
-        power_expand_board.set_power("DC6", 0)
-
-# ───────────────────────── GRIPPER ─────────────────────────
-prev_l2 = 0
-prev_r2 = 0
-gripper_phase = 0      
-gripper_timer = 0
-
-GRIPPER_L2_TIME = 900   # เวลาที่กริปเปอร์คายออก
-
-def gripper_control():
-    global prev_l2, prev_r2, gripper_phase, gripper_timer
-
-    now = time.ticks_ms()
-    r2 = gamepad.is_key_pressed("N4")    # ปุ่มคีบเข้า
-    l2 = gamepad.is_key_pressed("N1")   # ปุ่มคีบออก
-
-    if r2 and not prev_r2:
-        gripper_phase = 1
-
-    if l2 and not prev_l2:
-        gripper_phase = 2
-        gripper_timer = now
-
-    prev_r2 = r2
-    prev_l2 = l2
-
-    if gripper_phase == 1:
-        power_expand_board.set_power("DC8", -100)  
-
-    elif gripper_phase == 2:
-        power_expand_board.set_power("DC8", 100)   
-        if now - gripper_timer >= GRIPPER_L2_TIME:
-            power_expand_board.set_power("DC8", 0)
-            gripper_phase = 0
-
-    else:
-        power_expand_board.set_power("DC8", 0)
+DEADZONE = 10          
+MAX_WHEEL_SPEED = 180  
+DRIVE_GAIN = 2         
+SLIDE_GAIN = -1.5       
+TURN_GAIN = 3          
 
 
-# ───────────────────────── LIFT ─────────────────────────
-def lift_control():
-    if gamepad.is_key_pressed("N2"):
-        power_expand_board.set_power("DC4", -80)    
-    elif gamepad.is_key_pressed("N3"):
-        power_expand_board.set_power("DC4", 50)     
-    else:
-        power_expand_board.set_power("DC4", -10) 
-
-
-# ───────────────────────── BRUSHLESS ─────────────────────────
-prev_r1_bl = 0
-prev_r2_bl = 0
-prev_left_bl = 0
-bl_state = 0         
-
-BL_POWER = 80        
-BL_POWER_LOW = 75    
-
-def brushless_control():
-    global prev_r1_bl, prev_r2_bl, prev_left_bl, bl_state
-
-    r1   = gamepad.is_key_pressed("R1")
-    r2   = gamepad.is_key_pressed("R2")
-    left = gamepad.is_key_pressed("Left")
-
-    if r1 and not prev_r1_bl:
-        bl_state = 1   # กด R1 = เปิดเต็มติดค้าง
-
-    if left and not prev_left_bl:
-        bl_state = 2   # กด Left = เปิด 75% ติดค้าง
-
-    if r2 and not prev_r2_bl:
-        bl_state = 0   # กด R2 = ปิด
-
-    prev_r1_bl   = r1
-    prev_r2_bl   = r2
-    prev_left_bl = left
-
-    if bl_state == 1:
-        power_expand_board.set_power("BL1", BL_POWER)
-        power_expand_board.set_power("BL2", BL_POWER)
-    elif bl_state == 2:
-        power_expand_board.set_power("BL1", BL_POWER_LOW)
-        power_expand_board.set_power("BL2", BL_POWER_LOW)
-    else:
-        power_expand_board.set_power("BL1", 0)
-        power_expand_board.set_power("BL2", 0)
-        
-# ───────────────────────── SERVO ─────────────────────────
-SERVO_CURRENT_LIMIT = 1250 
-
-def red_servo():
-    if sv["shooter"].get_value("current") > SERVO_CURRENT_LIMIT:
-        sv["shooter"].set_power(0)
-
-def servo_move(angle):
-    sv["shooter"].move_to(angle, 50)
 
 
 # ───────────────────────── MOVEMENT ─────────────────────────
-DEADZONE = 10          # 🔧 ค่า deadzone จอย ถ้าจอยกระตุกตอนไม่แตะ ให้เพิ่มค่านี้
-MAX_WHEEL_SPEED = 180  # 🔧 ความเร็วสูงสุดของล้อ
-
-DRIVE_GAIN = 2         # 🔧 ความไวเดินหน้า-ถอยหลัง
-SLIDE_GAIN = -1.5       # 🔧 ความไวสไลด์ซ้าย-ขวา
-TURN_GAIN = 3          # 🔧 ความไวหมุนตัว
-
-
 WHEEL_TUNE = {"LF": 1.0, "LB": 1.0, "RF": 1.0, "RB": 1.1}
 
 def clamp(v, limit):
@@ -237,18 +96,160 @@ def control_movement():
     en["LB"].set_speed( clamp(lb, MAX_WHEEL_SPEED))
     en["RF"].set_speed(-clamp(rf, MAX_WHEEL_SPEED))
     en["RB"].set_speed(-clamp(rb, MAX_WHEEL_SPEED))
+# ───────────────────────── FEED ─────────────────────────
+feed_state = 0
+prev_feed_n1 = 0
+prev_feed_n2 = 0
+    
 
-"""
-MANUAL 
-"""
-def controler_1():
+def feed(a: int, b: int, c: int):
+    power_expand_board.set_power("DC2", a)
+    power_expand_board.set_power("DC1", b)
+    power_expand_board.set_power("DC3", c)
+
+def stop_feed():
+    power_expand_board.set_power("DC1", 0)
+    power_expand_board.set_power("DC2", 0)
+    power_expand_board.set_power("DC3", 0)
+
+def feed_control():
+    global feed_state, prev_feed_n1, prev_feed_n2
+
+    n1 = feed_up
+    n2 = feed_down
+
+    if n1 and not prev_feed_n1:
+        feed_state = 1
+    if n2 and not prev_feed_n2:
+        feed_state = 2
+
+    prev_feed_n1 = n1
+    prev_feed_n2 = n2
+
+    if gamepad.is_key_pressed("L1"):
+        feed_state = 0
+
+    if feed_state == 1:
+        feed(FEED_POWER, FEED_POWER, FEED_POWER) 
+    elif feed_state == 2:
+        feed(-FEED_POWER, -FEED_POWER, -FEED_POWER)  
+    else:
+        stop_feed()
+# # ───────────────────────── FEED DC6 (แยก) ─────────────────────────
+# dc6_state = 0      # 0=หยุด, 1=เปิด - ห้ามแก้ตรงนี้
+# prev_n1_dc6 = 0    # ห้ามแก้ตรงนี้
+
+# DC6_POWER = 80     # 🔧 ความแรง DC6 (0-100)
+
+# def dc6_control():
+#     global dc6_state, prev_n1_dc6
+
+#     n1 = gamepad.is_key_pressed("N1")
+
+#     if n1 and not prev_n1_dc6:
+#         dc6_state = 1   # กด N1 = เปิดติดค้าง
+
+#     prev_n1_dc6 = n1
+
+#     if gamepad.is_key_pressed("L1"):
+#         dc6_state = 0   # L1 = หยุด (ปุ่มเดียวกับ feed หลัก)
+
+#     if dc6_state == 1:
+#         power_expand_board.set_power("DC6", DC6_POWER)
+#     else:
+#         power_expand_board.set_power("DC6", 0)
+
+# ───────────────────────── GRIPPER ─────────────────────────
+prev_l2 = 0
+prev_r2 = 0
+gripper_phase = 0      
+gripper_timer = 0
+
+def gripper_control():
+    global prev_l2, prev_r2, gripper_phase, gripper_timer
+
+    now = time.ticks_ms()
+    if hold and not prev_r2:
+        gripper_phase = 1
+
+    if release and not prev_l2:
+        gripper_phase = 2
+        gripper_timer = now
+
+    prev_r2 = hold
+    prev_l2 = release
+
+    if gripper_phase == 1:
+        power_expand_board.set_power("DC8", -100)  
+
+    elif gripper_phase == 2:
+        power_expand_board.set_power("DC8", 100)   
+        if now - gripper_timer >= GRIPPER_L2_TIME:
+            power_expand_board.set_power("DC8", 0)
+            gripper_phase = 0
+
+    else:
+        power_expand_board.set_power("DC8", 0)
+
+
+# ───────────────────────── LIFT ─────────────────────────
+
+def lift_control():
+    if lift_up:
+        power_expand_board.set_power("DC4", -80)
+    elif lift_down:
+        power_expand_board.set_power("DC4", 50)
+    else:
+        power_expand_board.set_power("DC4", -10)
+
+
+# ───────────────────────── BRUSHLESS ─────────────────────────
+prev_r1_bl = 0
+prev_r2_bl = 0
+prev_left_bl = 0
+bl_state = 0         
+
+BL_POWER = 80        
+BL_POWER_LOW = 75    
+
+def brushless_control():
+    global prev_r1_bl, prev_r2_bl, prev_left_bl, bl_state
+
+    if B_stage1 and not prev_r1_bl:
+        bl_state = 1   # กด R1 = เปิดเต็มติดค้าง
+
+    if B_stage2 and not prev_left_bl:
+        bl_state = 2   # กด Left = เปิด 75% ติดค้าง
+
+    if B_stop and not prev_r2_bl:
+        bl_state = 0   # กด R2 = ปิด
+
+    prev_r1_bl   = B_stage1
+    prev_r2_bl   = B_stop
+    prev_left_bl = B_stage2
+
+    if bl_state == 1:
+        power_expand_board.set_power("BL1", BL_POWER)
+        power_expand_board.set_power("BL2", BL_POWER)
+    elif bl_state == 2:
+        power_expand_board.set_power("BL1", BL_POWER_LOW)
+        power_expand_board.set_power("BL2", BL_POWER_LOW)
+    else:
+        power_expand_board.set_power("BL1", 0)
+        power_expand_board.set_power("BL2", 0)
+        
+# ───────────────────────── SERVO ─────────────────────────
+SERVO_CURRENT_LIMIT = 1250 
+
+def red_servo():
+    if sv["shooter"].get_value("current") > SERVO_CURRENT_LIMIT:
+        sv["shooter"].set_power(0)
+
+def Servo_updown():
     if gamepad.is_key_pressed("Up"):
         sv["shooter"].move(-10, 10)  
     elif gamepad.is_key_pressed("Down"):
         sv["shooter"].move(10, 10)  
-def controler_2():
-    pass
-
 def change_mode():
     global mode
     if gamepad.is_key_pressed("≡"):
@@ -271,11 +272,10 @@ while True:
         if mode == "1":
             control_movement()
             feed_control()
-            dc6_control()
+            # dc6_control()
             brushless_control()   
-            controler_1()         
+            Servo_updown()
         else:
             control_movement()
             gripper_control()     
             lift_control()        
-            controler_2()
