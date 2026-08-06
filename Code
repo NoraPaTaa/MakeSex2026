@@ -56,8 +56,8 @@ B_stop   = gamepad.is_key_pressed("R2")
 #-------------------------------  Movement ----------------------------
 
 DEADZONE = 10          
-MAX_WHEEL_SPEED = 180  
-DRIVE_GAIN = 2         
+MAX_WHEEL_SPEED = 255
+DRIVE_GAIN = 3         
 SLIDE_GAIN = -1.5       
 TURN_GAIN = 3          
 
@@ -65,7 +65,7 @@ TURN_GAIN = 3
 
 
 # ───────────────────────── MOVEMENT ─────────────────────────
-WHEEL_TUNE = {"LF": 1.0, "LB": 1.0, "RF": 1.0, "RB": 1.1}
+WHEEL_TUNE = {"LF": 1.0, "LB": 1.0, "RF": 1.1, "RB": 1.05}
 
 def clamp(v, limit):
     return max(-limit, min(limit, v))
@@ -83,7 +83,7 @@ def control_movement():
     if abs(rx) < DEADZONE:
         rx = 0
 
-    vx = lx * SLIDE_GAIN
+    vx = -lx * SLIDE_GAIN
     vy = ly * DRIVE_GAIN
     w  = -rx * TURN_GAIN   # 🔧 ถ้าหมุนผิดทิศให้เอา - ออก
 
