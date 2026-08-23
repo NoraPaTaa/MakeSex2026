@@ -21,12 +21,12 @@ BTN_FEED_STOP = "L1"
 
 # ── ปุ่ม BRUSHLESS (โหมด 1) ───────────────────────────────────────
 BTN_BL_HIGH = "R1"
-BTN_BL_LOW  = "Left"
+#BTN_BL_LOW  = "Left"
 BTN_BL_OFF  = "R2"
 
 # ── ปุ่ม SERVO (โหมด 1) ───────────────────────────────────────────
-BTN_SERVO_UP   = "Up"
-BTN_SERVO_DOWN = "Down"
+BTN_SERVO_UP   = "Down"
+BTN_SERVO_DOWN = "Up"
 
 # ── ปุ่ม GRIPPER (โหมด 2) ─────────────────────────────────────────
 BTN_GRIP    = "N4"
@@ -42,7 +42,7 @@ FEED_PORT  = "DC2"
 
 # ── ค่า BRUSHLESS ─────────────────────────────────────────────────
 BL_POWER_HIGH = 90
-BL_POWER_LOW  = 75
+#BL_POWER_LOW  = 75
 BL_PORT1      = "BL1"
 BL_PORT2      = "BL2"
 
@@ -62,7 +62,13 @@ LIFT_UP_POWER   = -80
 LIFT_DOWN_POWER =  500
 LIFT_HOLD_POWER = -10
 LIFT_PORT       = "DC8"
+# ── ค่า BLOCK ─────────────────────────────────────────────────────
+BTN_BLOCK_SUCK    = "Up"     # ปุ่มดูดติดค้าง / กดซ้ำเพื่อหยุด
+BTN_BLOCK_RELEASE = "Down"   # ปุ่มดันออก-กลับ อัตโนมัติ
 
+BLOCK_SUCK_POWER    = 80    
+BLOCK_RELEASE_POWER = 100    
+BLOCK_RELEASE_TIME  = 500  
 # ── ค่า MOVEMENT ──────────────────────────────────────────────────
 DEADZONE        = 10
 MAX_WHEEL_SPEED = 255
@@ -157,15 +163,15 @@ def brushless_control():
     global _bl_state, _prev_bl_high, _prev_bl_low, _prev_bl_off
 
     high = gamepad.is_key_pressed(BTN_BL_HIGH)
-    low  = gamepad.is_key_pressed(BTN_BL_LOW)
+    #low  = gamepad.is_key_pressed(BTN_BL_LOW)
     off  = gamepad.is_key_pressed(BTN_BL_OFF)
 
     if high and not _prev_bl_high: _bl_state = 1
-    if low  and not _prev_bl_low:  _bl_state = 2
+    #if low  and not _prev_bl_low:  _bl_state = 2
     if off  and not _prev_bl_off:  _bl_state = 0
 
     _prev_bl_high = high
-    _prev_bl_low  = low
+    #_prev_bl_low  = low
     _prev_bl_off  = off
 
     if _bl_state == 1:
@@ -233,6 +239,77 @@ def lift_control():
     else:
         power_expand_board.set_power(LIFT_PORT, LIFT_HOLD_POWER)
 
+def Block_Suck():
+    global _suck_state, _prev_suck_btn
+
+    btn = gamepad.is_key_pressed(BTN_BLOCK_SUCK)
+
+    if btn and not _prev_suck_btn:
+        _suck_state = 0 if _suck_state == 1 else 1   # กดสลับเปิด/ปิด
+
+    _prev_suck_btn = btn
+
+    if _suck_state == 1:
+        power_expand_board.set_power("DC4", BLOCK_SUCK_POWER)
+        power_expand_board.set_power("DC5", BLOCK_SUCK_POWER)
+    else:
+        power_expand_board.set_power("DC4", 0)
+        power_expand_board.set_power("DC5", 0)
+
+
+#---------------------------------- block -------------------------------
+_suck_state    = 0    
+_prev_suck_btn = 0    
+
+def Block_Suck():
+    global _suck_state, _prev_suck_btn
+
+    btn = gamepad.is_key_pressed(BTN_BLOCK_SUCK)
+
+    if btn and not _prev_suck_btn:
+        _suck_state = 0 if _suck_state == 1 else 1   
+
+    _prev_suck_btn = btn
+
+    if _suck_state == 1:
+        power_expand_board.set_power("DC4", BLOCK_SUCK_POWER)
+        power_expand_board.set_power("DC5", -BLOCK_SUCK_POWER)
+    else:
+        power_expand_board.set_power("DC4", 0)
+        power_expand_board.set_power("DC5", 0)
+
+_release_phase = 0    
+_release_timer = 0    
+_prev_rel_btn  = 0    
+
+def Block_Release():
+    global _release_phase, _release_timer, _prev_rel_btn
+
+    now = time.ticks_ms()
+    btn = gamepad.is_key_pressed(BTN_BLOCK_RELEASE)
+
+    if btn and not _prev_rel_btn and _release_phase == 0:
+        _release_phase = 1
+        _release_timer = now
+
+    _prev_rel_btn = btn
+
+    if _release_phase == 1:
+        power_expand_board.set_power("DC6",  -BLOCK_RELEASE_POWER) 
+        if now - _release_timer >= BLOCK_RELEASE_TIME:
+            _release_phase = 2
+            _release_timer = now
+
+    elif _release_phase == 2:
+        power_expand_board.set_power("DC6", BLOCK_RELEASE_POWER)
+        if now - _release_timer >= 600:
+            power_expand_board.set_power("DC6", 0)
+            _release_phase = 0
+
+    else:
+        power_expand_board.set_power("DC6", 0)
+
+
 
 # ── MODE ───────────────────────────────────────────────────────────
 def change_mode():
@@ -258,6 +335,8 @@ while True:
             feed_control()
             brushless_control()
             servo_control()
+            Block_Release()
+            Block_Suck()
         else:
             control_movement()
             gripper_control()
