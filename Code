@@ -302,7 +302,7 @@ def Block_Release():
 
     elif _release_phase == 2:
         power_expand_board.set_power("DC6", BLOCK_RELEASE_POWER)
-        if now - _release_timer >= 600:
+        if now - _release_timer >= 700:
             power_expand_board.set_power("DC6", 0)
             _release_phase = 0
 
