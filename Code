@@ -11,64 +11,65 @@ from mbuild.led_matrix import led_matrix_class
 import time
 
 # ── ปุ่ม MODE ──────────────────────────────────────────────────────
-BTN_MODE1   = "≡"       # โหมด 1
-BTN_MODE2   = "+"       # โหมด 2
+BTN_MODE1   = "≡"
+BTN_MODE2   = "+"
 
 # ── ปุ่ม FEED (โหมด 1) ────────────────────────────────────────────
-BTN_FEED_FWD  = "N2"    
-BTN_FEED_REV  = "N3"    
-BTN_FEED_STOP = "L1"    
+BTN_FEED_FWD  = "N3"
+BTN_FEED_REV  = "N2"
+BTN_FEED_STOP = "L1"
 
 # ── ปุ่ม BRUSHLESS (โหมด 1) ───────────────────────────────────────
-BTN_BL_HIGH   = "R1"    
-BTN_BL_LOW    = "Left"  
-BTN_BL_OFF    = "R2"    
+BTN_BL_HIGH = "R1"
+BTN_BL_LOW  = "Left"
+BTN_BL_OFF  = "R2"
 
 # ── ปุ่ม SERVO (โหมด 1) ───────────────────────────────────────────
-BTN_SERVO_UP   = "Up"   
-BTN_SERVO_DOWN = "Down" 
+BTN_SERVO_UP   = "Up"
+BTN_SERVO_DOWN = "Down"
+
 # ── ปุ่ม GRIPPER (โหมด 2) ─────────────────────────────────────────
-BTN_GRIP    = "N4"      
-BTN_RELEASE = "N1"      
+BTN_GRIP    = "N4"
+BTN_RELEASE = "N1"
 
 # ── ปุ่ม LIFT (โหมด 2) ────────────────────────────────────────────
-BTN_LIFT_UP   = "N2"   
-BTN_LIFT_DOWN = "N3"    
+BTN_LIFT_UP   = "N2"
+BTN_LIFT_DOWN = "N3"
 
 # ── ค่า FEED ──────────────────────────────────────────────────────
-FEED_POWER    = 90      
-FEED_PORT     = "DC2"   
-
-# ── ค่า GRIPPER ───────────────────────────────────────────────────
-GRIP_POWER    = 100     
-GRIP_TIME     = 900     
-GRIP_PORT     = "DC7"   
-
-# ── ค่า LIFT ──────────────────────────────────────────────────────
-LIFT_UP_POWER   = -80   
-LIFT_DOWN_POWER =  50   
-LIFT_HOLD_POWER = -10   
-LIFT_PORT       = "DC8" 
+FEED_POWER = 90
+FEED_PORT  = "DC2"
 
 # ── ค่า BRUSHLESS ─────────────────────────────────────────────────
-BL_POWER_HIGH = 80      
-BL_POWER_LOW  = 75      
+BL_POWER_HIGH = 90
+BL_POWER_LOW  = 75
 BL_PORT1      = "BL1"
 BL_PORT2      = "BL2"
 
 # ── ค่า SERVO ─────────────────────────────────────────────────────
-SERVO_STEP    = 10     
-SERVO_SPEED   = 10      
-SERVO_CURRENT_LIMIT = 1250  
+SERVO_ANGLE_UP      = 0    # 🔧 องศาตอนกด Up
+SERVO_ANGLE_DOWN    = -30    # 🔧 องศาตอนกด Down
+SERVO_SPEED         = 10    # 🔧 ความเร็วหมุน (0-100)
+SERVO_CURRENT_LIMIT = 1250  # 🔧 กระแสสูงสุดก่อนตัดไฟ (ป้องกันไฟแดง)
+
+# ── ค่า GRIPPER ───────────────────────────────────────────────────
+GRIP_POWER = 70
+GRIP_TIME  = 150
+GRIP_PORT  = "DC7"
+
+# ── ค่า LIFT ──────────────────────────────────────────────────────
+LIFT_UP_POWER   = -80
+LIFT_DOWN_POWER =  500
+LIFT_HOLD_POWER = -10
+LIFT_PORT       = "DC8"
 
 # ── ค่า MOVEMENT ──────────────────────────────────────────────────
-DEADZONE        = 10   
-MAX_WHEEL_SPEED = 255   
-DRIVE_GAIN      = 3.0   
-SLIDE_GAIN      = -2  
-TURN_GAIN       = 3.0   
+DEADZONE        = 10
+MAX_WHEEL_SPEED = 255
+DRIVE_GAIN      = 3.0
+SLIDE_GAIN      = -2.0
+TURN_GAIN       = 3.0
 
-# 🔧 ปรับล้อแต่ละตัวแยกได้ถ้าหุ่นวิ่งไม่ตรง (1.0 = ปกติ)
 WHEEL_TUNE = {
     "LF": 1.00,
     "LB": 1.00,
@@ -76,6 +77,7 @@ WHEEL_TUNE = {
     "RB": 1.05,
 }
 
+# ── HARDWARE SETUP ─────────────────────────────────────────────────
 en = {
     "LF": encoder_motor_class("M1", "INDEX1"),
     "LB": encoder_motor_class("M3", "INDEX1"),
@@ -86,6 +88,10 @@ sv = {
     "shooter": smartservo_class("M6", "INDEX1"),
 }
 mode = "1"
+
+# ══════════════════════════════════════════════════════════════════
+# ห้ามแก้ใต้นี้ถ้าไม่จำเป็น
+# ══════════════════════════════════════════════════════════════════
 
 def clamp(v, limit):
     return max(-limit, min(limit, v))
@@ -116,7 +122,7 @@ def control_movement():
 
 
 # ── FEED ───────────────────────────────────────────────────────────
-_feed_state = 0
+_feed_state    = 0
 _prev_feed_fwd = 0
 _prev_feed_rev = 0
 
@@ -142,7 +148,7 @@ def feed_control():
 
 
 # ── BRUSHLESS ──────────────────────────────────────────────────────
-_bl_state = 0
+_bl_state     = 0
 _prev_bl_high = 0
 _prev_bl_low  = 0
 _prev_bl_off  = 0
@@ -180,16 +186,16 @@ def red_servo():
 
 def servo_control():
     if gamepad.is_key_pressed(BTN_SERVO_UP):
-        sv["shooter"].move(-SERVO_STEP, SERVO_SPEED)
+        sv["shooter"].move_to(SERVO_ANGLE_UP,   SERVO_SPEED)
     elif gamepad.is_key_pressed(BTN_SERVO_DOWN):
-        sv["shooter"].move( SERVO_STEP, SERVO_SPEED)
+        sv["shooter"].move_to(SERVO_ANGLE_DOWN, SERVO_SPEED)
 
 
 # ── GRIPPER ────────────────────────────────────────────────────────
 _grip_phase = 0
-_grip_timer  = 0
-_prev_grip   = 0
-_prev_rel    = 0
+_grip_timer = 0
+_prev_grip  = 0
+_prev_rel   = 0
 
 def gripper_control():
     global _grip_phase, _grip_timer, _prev_grip, _prev_rel
@@ -208,9 +214,9 @@ def gripper_control():
     _prev_rel  = rel
 
     if _grip_phase == 1:
-        power_expand_board.set_power(GRIP_PORT, -GRIP_POWER)
+        power_expand_board.set_power(GRIP_PORT, GRIP_POWER)
     elif _grip_phase == 2:
-        power_expand_board.set_power(GRIP_PORT,  GRIP_POWER)
+        power_expand_board.set_power(GRIP_PORT,  -GRIP_POWER)
         if now - _grip_timer >= GRIP_TIME:
             power_expand_board.set_power(GRIP_PORT, 0)
             _grip_phase = 0
@@ -235,9 +241,9 @@ def change_mode():
     if gamepad.is_key_pressed(BTN_MODE2): mode = "2"
 
 
-# ╔══════════════════════════════════════════════════════════════════╗
-# ║                        MAIN LOOP                                ║
-# ╚══════════════════════════════════════════════════════════════════╝
+# ══════════════════════════════════════════════════════════════════
+# MAIN LOOP
+# ══════════════════════════════════════════════════════════════════
 while True:
     if power_manage_module.is_auto_mode():
         pass
