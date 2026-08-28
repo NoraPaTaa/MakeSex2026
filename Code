@@ -30,7 +30,7 @@ BTN_SERVO_UP   = "Left"
 BTN_SERVO_DOWN = "Right"
 # ── ค่า SERVO M5 ──────────────────────────────────────────────────
 SERVO_M5_ANGLE_UP   =   -37   
-SERVO_M5_ANGLE_MID  = -22   
+SERVO_M5_ANGLE_MID  = -20   
 SERVO_M5_ANGLE_DOWN = -10   
 SERVO_M5_SPEED      =  10   
 
@@ -51,7 +51,7 @@ FEED_POWER = 90
 FEED_PORT  = "DC2"
 
 # ── ค่า BRUSHLESS ─────────────────────────────────────────────────
-BL_POWER_HIGH = 20
+BL_POWER_HIGH = 60
 BL_PORT1      = "BL1"
 BL_PORT2      = "BL2"
 
@@ -445,20 +445,22 @@ def approach_back(target, fast_speed=150, slow_speed=60, slow_distance=125):
     stop()
     
 def Auto_system():
-    
     backward(100)
-    wait_until_back_greater_than(60)
+    time.sleep_ms(400)
     stop()
-    time.sleep_ms(100)
-    slide_right(100)
+    time.sleep_ms(50)
+    slide_right(150)
     power_expand_board.set_power(LIFT_PORT, LIFT_UP_POWER)
     time.sleep_ms(300)
     power_expand_board.set_power(LIFT_PORT, LIFT_HOLD_POWER)
-    wait_until_left_greater_than(70)
     stop()
     time.sleep_ms(100)
-    approach_back(140, 150, 60, 125)
+    backward(150)
+    time.sleep_ms(500)
+    stop()
+    time.sleep_ms(100)
     power_expand_board.set_power(GRIP_PORT,  GRIP_POWER)
+    timme.sleep_ms(200)
     power_expand_board.set_power(LIFT_PORT, LIFT_UP_POWER)
     time.sleep_ms(200)
     power_expand_board.set_power(LIFT_PORT, LIFT_HOLD_POWER)
@@ -506,6 +508,68 @@ def Auto_system():
     forward(60)
     time.sleep_ms(800)
     stop()
+    
+    
+    # backward(100)
+    # wait_until_back_greater_than(60)
+    # stop()
+    # time.sleep_ms(100)
+    # slide_right(100)
+    # power_expand_board.set_power(LIFT_PORT, LIFT_UP_POWER)
+    # time.sleep_ms(300)
+    # power_expand_board.set_power(LIFT_PORT, LIFT_HOLD_POWER)
+    # wait_until_left_greater_than(70)
+    # stop()
+    # time.sleep_ms(100)
+    # approach_back(140, 150, 60, 125)
+    # power_expand_board.set_power(GRIP_PORT,  GRIP_POWER)
+    # power_expand_board.set_power(LIFT_PORT, LIFT_UP_POWER)
+    # time.sleep_ms(200)
+    # power_expand_board.set_power(LIFT_PORT, LIFT_HOLD_POWER)
+    # forward(100)
+    # time.sleep_ms(400)
+    # stop()
+    # time.sleep_ms(100)
+    # turn_right(100)
+    # time.sleep_ms(500)
+    # stop()
+    # time.sleep_ms(100)
+    # backward(100)
+    # time.sleep_ms(500)
+    # stop()
+    # time.sleep_ms(100)
+    # power_expand_board.set_power(GRIP_PORT,  -GRIP_POWER)
+    # time.sleep_ms(200)
+    # power_expand_board.set_power(GRIP_PORT,0)
+    # forward(100)
+    # time.sleep_ms(400)
+    # stop()
+    # time.sleep_ms(100)
+    # turn_left(100)
+    # time.sleep_ms(500)
+    # stop()
+    # time.sleep_ms(100)
+    # forward(50)
+    # time.sleep_ms(2000)
+    # stop()
+    # time.sleep_ms(100)
+    # backward(120)
+    # time.sleep_ms(500)
+    # stop()
+    # time.sleep_ms(100)
+    # turn_right(100)
+    # time.sleep_ms(500)
+    # forward(100)
+    # time.sleep_ms(300)
+    # stop()
+    # time.sleep_ms(100)
+    # turn_right(100)
+    # time.sleep_ms(500)
+    # stop()
+    # time.sleep_ms(100)
+    # forward(60)
+    # time.sleep_ms(800)
+    # stop()
 
 _auto_started = False
 
