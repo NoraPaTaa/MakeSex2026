@@ -9,24 +9,34 @@ from mbuild import gamepad
 from mbuild.smartservo import smartservo_class
 from mbuild.led_matrix import led_matrix_class
 import time
+from mbuild.ranging_sensor import ranging_sensor_class
+
 
 # ── ปุ่ม MODE ──────────────────────────────────────────────────────
-BTN_MODE1   = "≡"
-BTN_MODE2   = "+"
+BTN_MODE1 = "≡"
+BTN_MODE2 = "+"
 
 # ── ปุ่ม FEED (โหมด 1) ────────────────────────────────────────────
-BTN_FEED_FWD  = "N3"
-BTN_FEED_REV  = "N2"
-BTN_FEED_STOP = "L1"
+BTN_FEED_FWD  = "N1"
+BTN_FEED_REV  = "L2"
+BTN_FEED_STOP = "L1"    # L1 = หยุด DC ทุกอย่างด้วย
 
 # ── ปุ่ม BRUSHLESS (โหมด 1) ───────────────────────────────────────
 BTN_BL_HIGH = "R1"
-#BTN_BL_LOW  = "Left"
 BTN_BL_OFF  = "R2"
 
-# ── ปุ่ม SERVO (โหมด 1) ───────────────────────────────────────────
-BTN_SERVO_UP   = "Down"
-BTN_SERVO_DOWN = "Up"
+# ── ปุ่ม SERVO (โหมด 2) ───────────────────────────────────────────
+BTN_SERVO_UP   = "Left"
+BTN_SERVO_DOWN = "Right"
+# ── ค่า SERVO M5 ──────────────────────────────────────────────────
+SERVO_M5_ANGLE_UP   =   -37   
+SERVO_M5_ANGLE_MID  = -22   
+SERVO_M5_ANGLE_DOWN = -10   
+SERVO_M5_SPEED      =  10   
+
+# ── ปุ่ม BLOCK (โหมด 1) ───────────────────────────────────────────
+BTN_BLOCK_SUCK    = "Up"
+BTN_BLOCK_RELEASE = "Down"
 
 # ── ปุ่ม GRIPPER (โหมด 2) ─────────────────────────────────────────
 BTN_GRIP    = "N4"
@@ -41,34 +51,33 @@ FEED_POWER = 90
 FEED_PORT  = "DC2"
 
 # ── ค่า BRUSHLESS ─────────────────────────────────────────────────
-BL_POWER_HIGH = 90
-#BL_POWER_LOW  = 75
+BL_POWER_HIGH = 20
 BL_PORT1      = "BL1"
 BL_PORT2      = "BL2"
 
 # ── ค่า SERVO ─────────────────────────────────────────────────────
-SERVO_ANGLE_UP      = 0    # 🔧 องศาตอนกด Up
-SERVO_ANGLE_DOWN    = -30    # 🔧 องศาตอนกด Down
-SERVO_SPEED         = 10    # 🔧 ความเร็วหมุน (0-100)
-SERVO_CURRENT_LIMIT = 1250  # 🔧 กระแสสูงสุดก่อนตัดไฟ (ป้องกันไฟแดง)
+SERVO_ANGLE_UP      = 70
+SERVO_ANGLE_DOWN    = 0
+SERVO_SPEED         = 10
+SERVO_CURRENT_LIMIT = 1250
 
 # ── ค่า GRIPPER ───────────────────────────────────────────────────
 GRIP_POWER = 70
-GRIP_TIME  = 150
-GRIP_PORT  = "DC7"
+GRIP_TIME  = 180
+GRIP_PORT  = "DC1"
 
 # ── ค่า LIFT ──────────────────────────────────────────────────────
-LIFT_UP_POWER   = -80
-LIFT_DOWN_POWER =  500
+LIFT_UP_POWER   = -100
+LIFT_DOWN_POWER =  80
 LIFT_HOLD_POWER = -10
-LIFT_PORT       = "DC8"
-# ── ค่า BLOCK ─────────────────────────────────────────────────────
-BTN_BLOCK_SUCK    = "Up"     # ปุ่มดูดติดค้าง / กดซ้ำเพื่อหยุด
-BTN_BLOCK_RELEASE = "Down"   # ปุ่มดันออก-กลับ อัตโนมัติ
+LIFT_PORT       = "DC7"
 
-BLOCK_SUCK_POWER    = 80    
-BLOCK_RELEASE_POWER = 100    
-BLOCK_RELEASE_TIME  = 500  
+# ── ค่า BLOCK ─────────────────────────────────────────────────────
+BLOCK_SUCK_POWER    =  80
+BLOCK_RELEASE_POWER = 100
+BLOCK_IN_TIME       = 600   
+BLOCK_OUT_TIME      = 800   
+
 # ── ค่า MOVEMENT ──────────────────────────────────────────────────
 DEADZONE        = 10
 MAX_WHEEL_SPEED = 255
@@ -80,7 +89,7 @@ WHEEL_TUNE = {
     "LF": 1.00,
     "LB": 1.00,
     "RF": 1.10,
-    "RB": 1.05,
+    "RB": 1.00,
 }
 
 # ── HARDWARE SETUP ─────────────────────────────────────────────────
@@ -91,16 +100,58 @@ en = {
     "RB": encoder_motor_class("M4", "INDEX1"),
 }
 sv = {
-    "shooter": smartservo_class("M6", "INDEX1"),
+    "shooter": smartservo_class("M5", "INDEX1"),
 }
 mode = "1"
-
+sv["lifter"] = smartservo_class("M6", "INDEX1")
+Ranging_left = ranging_sensor_class("PORT2", "INDEX1")
+Ranging_back = ranging_sensor_class("PORT3", "INDEX1")
 # ══════════════════════════════════════════════════════════════════
 # ห้ามแก้ใต้นี้ถ้าไม่จำเป็น
 # ══════════════════════════════════════════════════════════════════
 
+# state ทุกระบบ
+_feed_state    = 0
+_prev_feed_fwd = 0
+_prev_feed_rev = 0
+
+_bl_state     = 0
+_prev_bl_high = 0
+_prev_bl_off  = 0
+
+_suck_state    = 0
+_prev_suck_btn = 0
+
+_release_phase = 0
+_release_timer = 0
+_prev_rel_btn  = 0
+
+_grip_phase = 0
+_grip_timer = 0
+_prev_grip  = 0
+_prev_rel   = 0
+
+
 def clamp(v, limit):
     return max(-limit, min(limit, v))
+
+
+# ── STOP ALL ───────────────────────────────────────────────────────
+def stop_all():
+    global _feed_state, _suck_state, _release_phase, _bl_state
+    power_expand_board.set_power("DC1", 0)
+    power_expand_board.set_power("DC2", 0)
+    power_expand_board.set_power("DC3", 0)
+    power_expand_board.set_power("DC4", 0)
+    power_expand_board.set_power("DC5", 0)
+    power_expand_board.set_power("DC6", 0)
+    power_expand_board.set_power("DC7", 0)
+    power_expand_board.set_power("DC8", 0)
+    _feed_state    = 0
+    _suck_state    = 0
+    _release_phase = 0
+    _bl_state      = 0
+
 
 # ── MOVEMENT ───────────────────────────────────────────────────────
 def control_movement():
@@ -126,12 +177,7 @@ def control_movement():
     en["RF"].set_speed(-clamp(rf, MAX_WHEEL_SPEED))
     en["RB"].set_speed(-clamp(rb, MAX_WHEEL_SPEED))
 
-
 # ── FEED ───────────────────────────────────────────────────────────
-_feed_state    = 0
-_prev_feed_fwd = 0
-_prev_feed_rev = 0
-
 def feed_control():
     global _feed_state, _prev_feed_fwd, _prev_feed_rev
 
@@ -140,46 +186,43 @@ def feed_control():
 
     if fwd and not _prev_feed_fwd: _feed_state = 1
     if rev and not _prev_feed_rev: _feed_state = 2
-    if gamepad.is_key_pressed(BTN_FEED_STOP): _feed_state = 0
 
     _prev_feed_fwd = fwd
     _prev_feed_rev = rev
 
     if _feed_state == 1:
-        power_expand_board.set_power(FEED_PORT,  FEED_POWER)
+        power_expand_board.set_power(FEED_PORT,  -FEED_POWER)
+        power_expand_board.set_power("DC6",  FEED_POWER)
     elif _feed_state == 2:
-        power_expand_board.set_power(FEED_PORT, -FEED_POWER)
+        power_expand_board.set_power(FEED_PORT, FEED_POWER)
+        power_expand_board.set_power("DC6", -FEED_POWER)
     else:
         power_expand_board.set_power(FEED_PORT, 0)
+        power_expand_board.set_power("DC6", 0)
 
+    if gamepad.is_key_pressed("N2"):
+        power_expand_board.set_power("DC3",  -FEED_POWER)
+    elif gamepad.is_key_pressed("N3"):
+        power_expand_board.set_power("DC3", FEED_POWER)
+    else:
+        power_expand_board.set_power("DC3", 0)
 
 # ── BRUSHLESS ──────────────────────────────────────────────────────
-_bl_state     = 0
-_prev_bl_high = 0
-_prev_bl_low  = 0
-_prev_bl_off  = 0
-
 def brushless_control():
-    global _bl_state, _prev_bl_high, _prev_bl_low, _prev_bl_off
+    global _bl_state, _prev_bl_high, _prev_bl_off
 
     high = gamepad.is_key_pressed(BTN_BL_HIGH)
-    #low  = gamepad.is_key_pressed(BTN_BL_LOW)
     off  = gamepad.is_key_pressed(BTN_BL_OFF)
 
     if high and not _prev_bl_high: _bl_state = 1
-    #if low  and not _prev_bl_low:  _bl_state = 2
     if off  and not _prev_bl_off:  _bl_state = 0
 
     _prev_bl_high = high
-    #_prev_bl_low  = low
     _prev_bl_off  = off
 
     if _bl_state == 1:
         power_expand_board.set_power(BL_PORT1, BL_POWER_HIGH)
         power_expand_board.set_power(BL_PORT2, BL_POWER_HIGH)
-    elif _bl_state == 2:
-        power_expand_board.set_power(BL_PORT1, BL_POWER_LOW)
-        power_expand_board.set_power(BL_PORT2, BL_POWER_LOW)
     else:
         power_expand_board.set_power(BL_PORT1, 0)
         power_expand_board.set_power(BL_PORT2, 0)
@@ -196,13 +239,65 @@ def servo_control():
     elif gamepad.is_key_pressed(BTN_SERVO_DOWN):
         sv["shooter"].move_to(SERVO_ANGLE_DOWN, SERVO_SPEED)
 
+def servo_m5_control():
+    if gamepad.is_key_pressed("Up"):
+        sv["lifter"].move_to(SERVO_M5_ANGLE_UP,   SERVO_M5_SPEED)
+    elif gamepad.is_key_pressed("Left"):
+        sv["lifter"].move_to(SERVO_M5_ANGLE_MID,  SERVO_M5_SPEED)
+    elif gamepad.is_key_pressed("Down"):
+        sv["lifter"].move_to(SERVO_M5_ANGLE_DOWN, SERVO_M5_SPEED)
+# ── BLOCK SUCK (กดสลับเปิด/ปิด DC4+DC5) ──────────────────────────
+def Block_Suck():
+    global _suck_state, _prev_suck_btn
+
+    btn = gamepad.is_key_pressed(BTN_BLOCK_SUCK)
+
+    if btn and not _prev_suck_btn:
+        _suck_state = 0 if _suck_state == 1 else 1
+
+    _prev_suck_btn = btn
+
+    if _suck_state == 1:
+        power_expand_board.set_power("DC4",  BLOCK_SUCK_POWER)
+        power_expand_board.set_power("DC5", -BLOCK_SUCK_POWER)
+        sv["shooter"].move_to(SERVO_ANGLE_UP, SERVO_SPEED)    # ← servo M6 ไปตำแหน่ง Up ตอน suck เปิด
+    else:
+        power_expand_board.set_power("DC4", 0)
+        power_expand_board.set_power("DC5", 0)
+        sv["shooter"].move_to(SERVO_ANGLE_DOWN, SERVO_SPEED)  # ← servo M6 กลับตำแหน่ง Down ตอน suck ปิด
+
+
+# ── BLOCK RELEASE (กดครั้งเดียว เข้า 3 วิ แล้วออก 0.7 วิ) ────────
+def Block_Release():
+    global _release_phase, _release_timer, _prev_rel_btn
+
+    now = time.ticks_ms()
+    btn = gamepad.is_key_pressed(BTN_BLOCK_RELEASE)
+
+    if btn and not _prev_rel_btn and _release_phase == 0:
+        _release_phase = 1
+        _release_timer = now
+
+    _prev_rel_btn = btn
+
+    if _release_phase == 1:
+        power_expand_board.set_power("DC8", -BLOCK_RELEASE_POWER)
+        sv["shooter"].move_to(SERVO_ANGLE_UP, SERVO_SPEED)    # ← servo M6 ไปตำแหน่ง Up ตอนดันเข้า
+        if now - _release_timer >= BLOCK_IN_TIME:
+            _release_phase = 2
+            _release_timer = now
+
+    elif _release_phase == 2:
+        power_expand_board.set_power("DC8",  BLOCK_RELEASE_POWER)
+        sv["shooter"].move_to(SERVO_ANGLE_DOWN, SERVO_SPEED)  # ← servo M6 กลับตำแหน่ง Down ตอนดันออก
+        if now - _release_timer >= BLOCK_OUT_TIME:
+            power_expand_board.set_power("DC8", 0)
+            _release_phase = 0
+
+    else:
+        power_expand_board.set_power("DC8", 0)
 
 # ── GRIPPER ────────────────────────────────────────────────────────
-_grip_phase = 0
-_grip_timer = 0
-_prev_grip  = 0
-_prev_rel   = 0
-
 def gripper_control():
     global _grip_phase, _grip_timer, _prev_grip, _prev_rel
 
@@ -220,9 +315,9 @@ def gripper_control():
     _prev_rel  = rel
 
     if _grip_phase == 1:
-        power_expand_board.set_power(GRIP_PORT, GRIP_POWER)
+        power_expand_board.set_power(GRIP_PORT,  GRIP_POWER)
     elif _grip_phase == 2:
-        power_expand_board.set_power(GRIP_PORT,  -GRIP_POWER)
+        power_expand_board.set_power(GRIP_PORT, -50)
         if now - _grip_timer >= GRIP_TIME:
             power_expand_board.set_power(GRIP_PORT, 0)
             _grip_phase = 0
@@ -239,77 +334,6 @@ def lift_control():
     else:
         power_expand_board.set_power(LIFT_PORT, LIFT_HOLD_POWER)
 
-def Block_Suck():
-    global _suck_state, _prev_suck_btn
-
-    btn = gamepad.is_key_pressed(BTN_BLOCK_SUCK)
-
-    if btn and not _prev_suck_btn:
-        _suck_state = 0 if _suck_state == 1 else 1   # กดสลับเปิด/ปิด
-
-    _prev_suck_btn = btn
-
-    if _suck_state == 1:
-        power_expand_board.set_power("DC4", BLOCK_SUCK_POWER)
-        power_expand_board.set_power("DC5", BLOCK_SUCK_POWER)
-    else:
-        power_expand_board.set_power("DC4", 0)
-        power_expand_board.set_power("DC5", 0)
-
-
-#---------------------------------- block -------------------------------
-_suck_state    = 0    
-_prev_suck_btn = 0    
-
-def Block_Suck():
-    global _suck_state, _prev_suck_btn
-
-    btn = gamepad.is_key_pressed(BTN_BLOCK_SUCK)
-
-    if btn and not _prev_suck_btn:
-        _suck_state = 0 if _suck_state == 1 else 1   
-
-    _prev_suck_btn = btn
-
-    if _suck_state == 1:
-        power_expand_board.set_power("DC4", BLOCK_SUCK_POWER)
-        power_expand_board.set_power("DC5", -BLOCK_SUCK_POWER)
-    else:
-        power_expand_board.set_power("DC4", 0)
-        power_expand_board.set_power("DC5", 0)
-
-_release_phase = 0    
-_release_timer = 0    
-_prev_rel_btn  = 0    
-
-def Block_Release():
-    global _release_phase, _release_timer, _prev_rel_btn
-
-    now = time.ticks_ms()
-    btn = gamepad.is_key_pressed(BTN_BLOCK_RELEASE)
-
-    if btn and not _prev_rel_btn and _release_phase == 0:
-        _release_phase = 1
-        _release_timer = now
-
-    _prev_rel_btn = btn
-
-    if _release_phase == 1:
-        power_expand_board.set_power("DC6",  -BLOCK_RELEASE_POWER) 
-        if now - _release_timer >= BLOCK_RELEASE_TIME:
-            _release_phase = 2
-            _release_timer = now
-
-    elif _release_phase == 2:
-        power_expand_board.set_power("DC6", BLOCK_RELEASE_POWER)
-        if now - _release_timer >= 700:
-            power_expand_board.set_power("DC6", 0)
-            _release_phase = 0
-
-    else:
-        power_expand_board.set_power("DC6", 0)
-
-
 
 # ── MODE ───────────────────────────────────────────────────────────
 def change_mode():
@@ -317,27 +341,203 @@ def change_mode():
     if gamepad.is_key_pressed(BTN_MODE1): mode = "1"
     if gamepad.is_key_pressed(BTN_MODE2): mode = "2"
 
+#================= Auto set up =====================================
+
+# ใช้ชุดคำนวณเดียวกับ control_movement() เพื่อให้ทิศทาง Auto
+# ตรงกับการบังคับด้วยจอย
+
+def auto_move(vx, vy, w):
+    lf = (vy - vx + w) * WHEEL_TUNE["LF"]
+    lb = (vy + vx + w) * WHEEL_TUNE["LB"]
+    rf = (vy + vx - w) * WHEEL_TUNE["RF"]
+    rb = (vy - vx - w) * WHEEL_TUNE["RB"]
+
+    en["LF"].set_speed(clamp(lf, MAX_WHEEL_SPEED))
+    en["LB"].set_speed(clamp(lb, MAX_WHEEL_SPEED))
+    en["RF"].set_speed(-clamp(rf, MAX_WHEEL_SPEED))
+    en["RB"].set_speed(-clamp(rb, MAX_WHEEL_SPEED))
+
+
+def stop():
+    en["LF"].set_speed(0)
+    en["LB"].set_speed(0)
+    en["RF"].set_speed(0)
+    en["RB"].set_speed(0)
+
+
+# ── MOVEMENT ───────────────────────────────────────────────────────
+
+def forward(speed=100):
+    auto_move(0, speed, 0)
+
+
+def backward(speed=100):
+    auto_move(0, -speed, 0)
+
+
+def slide_left(speed=100):
+    auto_move(-speed, 0, 0)
+
+
+def slide_right(speed=100):
+    auto_move(speed, 0, 0)
+
+
+def turn_left(speed=100):
+    auto_move(0, 0, speed)
+
+
+def turn_right(speed=100):
+    auto_move(0, 0, -speed)
+
+
+# ── RANGING SENSOR ────────────────────────────────────────────────
+# PORT2 = ด้านซ้าย
+# PORT3 = ด้านหลัง
+
+def distance_left():
+    return Ranging_left.get_distance()
+
+
+def distance_back():
+    return Ranging_back.get_distance()
+
+
+# ── WAIT UNTIL : LEFT ─────────────────────────────────────────────
+
+def wait_until_left_less_than(distance_cm):
+    while distance_left() > distance_cm:
+        time.sleep_ms(10)
+    stop()
+
+
+def wait_until_left_greater_than(distance_cm):
+    while distance_left() < distance_cm:
+        time.sleep_ms(10)
+    stop()
+
+
+# ── WAIT UNTIL : BACK ─────────────────────────────────────────────
+
+def wait_until_back_less_than(distance_cm):
+    while distance_back() > distance_cm:
+        time.sleep_ms(10)
+    stop()
+
+
+def wait_until_back_greater_than(distance_cm):
+    while distance_back() < distance_cm:
+        time.sleep_ms(10)
+    stop()
+
+def approach_back(target, fast_speed=150, slow_speed=60, slow_distance=125):
+
+    backward(fast_speed)
+
+    while distance_back() > slow_distance:
+        time.sleep_ms(10)
+
+    backward(slow_speed)
+
+    while distance_back() > target:
+        time.sleep_ms(10)
+
+    stop()
+    
+def Auto_system():
+    
+    backward(100)
+    wait_until_back_greater_than(60)
+    stop()
+    time.sleep_ms(100)
+    slide_right(100)
+    power_expand_board.set_power(LIFT_PORT, LIFT_UP_POWER)
+    time.sleep_ms(300)
+    power_expand_board.set_power(LIFT_PORT, LIFT_HOLD_POWER)
+    wait_until_left_greater_than(70)
+    stop()
+    time.sleep_ms(100)
+    approach_back(140, 150, 60, 125)
+    power_expand_board.set_power(GRIP_PORT,  GRIP_POWER)
+    power_expand_board.set_power(LIFT_PORT, LIFT_UP_POWER)
+    time.sleep_ms(200)
+    power_expand_board.set_power(LIFT_PORT, LIFT_HOLD_POWER)
+    forward(100)
+    time.sleep_ms(400)
+    stop()
+    time.sleep_ms(100)
+    turn_right(100)
+    time.sleep_ms(500)
+    stop()
+    time.sleep_ms(100)
+    backward(100)
+    time.sleep_ms(500)
+    stop()
+    time.sleep_ms(100)
+    power_expand_board.set_power(GRIP_PORT,  -GRIP_POWER)
+    time.sleep_ms(200)
+    power_expand_board.set_power(GRIP_PORT,0)
+    forward(100)
+    time.sleep_ms(400)
+    stop()
+    time.sleep_ms(100)
+    turn_left(100)
+    time.sleep_ms(500)
+    stop()
+    time.sleep_ms(100)
+    forward(50)
+    time.sleep_ms(2000)
+    stop()
+    time.sleep_ms(100)
+    backward(120)
+    time.sleep_ms(500)
+    stop()
+    time.sleep_ms(100)
+    turn_right(100)
+    time.sleep_ms(500)
+    forward(100)
+    time.sleep_ms(300)
+    stop()
+    time.sleep_ms(100)
+    turn_right(100)
+    time.sleep_ms(500)
+    stop()
+    time.sleep_ms(100)
+    forward(60)
+    time.sleep_ms(800)
+    stop()
+
+_auto_started = False
 
 # ══════════════════════════════════════════════════════════════════
 # MAIN LOOP
 # ══════════════════════════════════════════════════════════════════
 while True:
     if power_manage_module.is_auto_mode():
-        pass
-        while not not power_manage_module.is_auto_mode():
-            pass
+        if not _auto_started:
+            _auto_started = True
+            Auto_system()
+
+        time.sleep_ms(10)
+
     else:
+        _auto_started = False
+
         change_mode()
         red_servo()
 
         if mode == "1":
             control_movement()
-            feed_control()
-            brushless_control()
-            servo_control()
-            Block_Release()
-            Block_Suck()
+            if gamepad.is_key_pressed("L1"):
+                stop_all()
+            else:
+                feed_control()
+                brushless_control()
+                servo_m5_control()
         else:
             control_movement()
             gripper_control()
             lift_control()
+            Block_Suck()
+            Block_Release()
+            servo_control()
